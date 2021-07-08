@@ -1,1 +1,2 @@
-include ':main', ':unit', ':integration', ':functional', ':builders'
+rootProject.name = 'stubby4j'
+enableFeaturePreview("VERSION_ORDERING_V2")

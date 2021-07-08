@@ -1,85 +1,57 @@
-// vim: ft=groovy
-import org.kt3k.gradle.plugin.coveralls.domain.CoberturaSourceReportFactory
-ext.coberturaSourceReportFactory = new CoberturaSourceReportFactory()
-project(':').ext.map = [:]
+// https://blog.gradle.org/jcenter-shutdown
+// jcenter has/is shutting down, therefore the following
+// legacy plugin application config is forcing Gradle to look in Maven
+buildscript {
+    repositories {
+        mavenLocal()
+        repositories {
+            maven {
+                url "https://plugins.gradle.org/m2/"
+            }
+        }
+    }
+    dependencies {
+        classpath "org.unbroken-dome.gradle-plugins:gradle-testsets-plugin:3.0.1"
+        classpath "com.github.ben-manes:gradle-versions-plugin:0.36.0"
+        classpath "com.bmuschko:gradle-nexus-plugin:2.3"
+    }
+}
 
-defaultTasks 'clean', 'build', 'allTestReport'
+apply plugin: "java-library"
+apply plugin: "idea"
+apply plugin: "eclipse"
+apply plugin: "jacoco"
+apply plugin: "org.unbroken-dome.test-sets"
+apply plugin: "com.bmuschko.nexus"
+apply plugin: "com.github.ben-manes.versions"
+
+
+defaultTasks 'clean', 'test', 'integrationTest', 'functionalTest', 'build'
 description = 'Gradle configuration for stubby4j'
 
-buildscript {
-   repositories {
-      mavenCentral()
-      jcenter()
-   }
-   dependencies {
-      classpath 'com.bmuschko:gradle-nexus-plugin:2.3'
-      classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.3.1'
-      classpath 'info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.1.4'
-   }
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters' << '-Xlint:deprecation'
 }
 
-allprojects {
-   apply plugin: 'java'
-   apply plugin: 'idea'
-   apply plugin: 'eclipse'
-   project.buildDir = 'target'
-   if (project.name != 'main') {
-      apply from: "$rootDir/conf/gradle/console.gradle"
-   }
+compileTestJava {
+    options.encoding = 'UTF-8'
 }
 
-apply from: "$rootDir/conf/gradle/ides.gradle"
-
-subprojects {
-   subproject ->
-      sourceCompatibility = 1.7
-      tasks.withType(JavaCompile) {
-         doFirst {
-            assert sourceCompatibility == "1.7": "The sourceCompatibility of $name was changed!"
-         }
-         options.encoding = 'UTF-8'
-      }
-      targetCompatibility = 1.7
-      repositories {
-         mavenCentral()
-         jcenter()
-         mavenLocal()
-      }
-      apply from: "$rootDir/conf/gradle/dependency.gradle"
+javadoc {
+    if (JavaVersion.current().isJava8Compatible()) {
+        options.addStringOption('Xdoclint:none', '-quiet')
+    }
 }
 
-task allTestReport(type: TestReport) {
-   destinationDir = file("$buildDir/reports/all")
-   reportOn subprojects*.test
-   doLast {
-      def total = 0
-      def failure = 0
-      def moduleTabs = "\t";
-      def prefixSpace = "      ";
-      def prefixDots = ":::::";
-      def hr = prefixSpace + "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::";
-      println ""
-      println hr
-
-      for ( testProjectName in project(':').ext.map ) {
-         total += testProjectName.value['total']
-         failure += testProjectName.value['failure']
-         println prefixSpace + prefixDots + "  " +  testProjectName.key +
-         " (failed: " + testProjectName.value['failure'] + ", passed: " + testProjectName.value['success'] + ", total: " + testProjectName.value['total'] + ")"
-         for ( testClassName in testProjectName.value ) {
-             if (testClassName.key == 'total' || testClassName.key == 'success' || testClassName.key == 'failure') {
-                  continue;
-             }
-             println prefixSpace + prefixDots + "    " +  moduleTabs + testClassName.key +
-                                     " (" + testClassName.value['success'] + "/" + testClassName.value['total'] + ")"
-         }
-         println hr
-      }
-      println prefixSpace + prefixDots + "                  Total tests executed in $stubbyProjectName: " + total
-      println hr
-      if (failure > 0) {
-         throw new GradleException(failure + " TESTS FAILED!!!")
-      }
-   }
+repositories {
+    mavenLocal()
+    mavenCentral()
 }
 
+apply from: "$rootDir/conf/gradle/dependencies.gradle"
+apply from: "$rootDir/conf/gradle/ide.gradle"
+apply from: "$rootDir/conf/gradle/multi-test-source-sets.gradle"
+apply from: "$rootDir/conf/gradle/jacoco.gradle"
+apply from: "$rootDir/conf/gradle/artifacts.gradle"
+apply from: "$rootDir/conf/gradle/sonatype.gradle"
